@@ -1,6 +1,3 @@
-// the PhantomData instances in this file are just to stop compiler complaints
-// about missing generics; feel free to remove them
-
 use std::{fmt::Display, ops::Rem};
 
 /// A Matcher is a single rule of fizzbuzz: given a function on T, should
@@ -88,6 +85,8 @@ where
 /// Convenience function: return a Fizzy which applies the standard fizz-buzz rules.
 pub fn fizz_buzz<T: 'static>() -> Fizzy<T>
 where
+// T must implement From<u8> (as in the test), and Rem, with the output being T. This is 
+// so the modulus operator can be used.
     T: Copy + Display + Rem<Output = T> + From<u8> + PartialEq,
 {
     let new = Fizzy::new();
