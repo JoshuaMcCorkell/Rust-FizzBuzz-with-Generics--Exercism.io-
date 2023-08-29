@@ -7,13 +7,13 @@ use std::{fmt::Display, ops::Rem};
 /// a word be substituted in? If yes, which word?
 pub struct Matcher<T> {
     substitution: Box<dyn Display>,
-    matcher: Box<dyn Fn(T) -> bool>,
+    matcher: Box<dyn FnMut(T) -> bool>,
 }
 
 impl<T> Matcher<T> {
     pub fn new<F, S>(matcher: F, subs: S) -> Matcher<T>
     where
-        F: Fn(T) -> bool + 'static,
+        F: FnMut(T) -> bool + 'static,
         S: Display + 'static,
     {
         Self {
@@ -32,42 +32,50 @@ impl<T> Matcher<T> {
 /// here because it's a simpler interface for students to implement.
 ///
 /// Also, it's a good excuse to try out using impl trait.
-pub struct Fizzy<T: Display + Copy> {
+pub struct Fizzy<T> {
     matchers: Vec<Matcher<T>>,
 }
 
-impl<T: Display + Copy + 'static> Default for Fizzy<T> {
+impl<T> Default for Fizzy<T>
+where
+    T: Display + Copy + 'static,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Display + Copy + 'static> Fizzy<T> {
+impl<T> Fizzy<T>
+where
+    T: Display + Copy + 'static,
+{
     pub fn new() -> Self {
         Self { matchers: vec![] }
     }
 
-    // feel free to change the signature to `mut self` if you like
+    /// Adds a matcher
     #[must_use]
     pub fn add_matcher(mut self, matcher: Matcher<T>) -> Self {
         self.matchers.push(matcher);
         self
     }
 
-    /// map this fizzy onto every element of an iterator, returning a new iterator
-    pub fn apply<I>(self, iter: I) -> impl Iterator<Item = String>
+    /// Maps this fizzy onto every element of an iterator, returning a new iterator
+    pub fn apply<I>(mut self, iter: I) -> impl Iterator<Item = String>
     where
         I: Iterator<Item = T>,
     {
         iter.map(move |item| {
             let mut new = String::new();
             let mut matched = false;
-            for matcher in &self.matchers {
+            // Check all the matchers, appending the string if necessary.
+            for matcher in &mut self.matchers {
                 if (matcher.matcher)(item) {
                     matched = true;
                     new.push_str(matcher.substitution.to_string().as_str());
                 }
             }
+            // If none matched, return the original item.
             if !matched {
                 item.to_string()
             } else {
@@ -77,7 +85,7 @@ impl<T: Display + Copy + 'static> Fizzy<T> {
     }
 }
 
-/// convenience function: return a Fizzy which applies the standard fizz-buzz rules
+/// Convenience function: return a Fizzy which applies the standard fizz-buzz rules.
 pub fn fizz_buzz<T: 'static>() -> Fizzy<T>
 where
     T: Copy + Display + Rem<Output = T> + From<u8> + PartialEq,
