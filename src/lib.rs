@@ -5,16 +5,16 @@ use std::{fmt::Display, ops::Rem};
 
 /// A Matcher is a single rule of fizzbuzz: given a function on T, should
 /// a word be substituted in? If yes, which word?
-pub struct Matcher<'a, T> {
-    substitution: Box<dyn Display + 'a>,
-    matcher: Box<dyn Fn(T) -> bool + 'a>,
+pub struct Matcher<T> {
+    substitution: Box<dyn Display>,
+    matcher: Box<dyn Fn(T) -> bool>,
 }
 
-impl<'a, T> Matcher<'a, T> {
-    pub fn new<F, S>(matcher: F, subs: S) -> Matcher<'a, T>
+impl<T> Matcher<T> {
+    pub fn new<F, S>(matcher: F, subs: S) -> Matcher<T>
     where
-        F: Fn(T) -> bool + 'a,
-        S: Display + 'a,
+        F: Fn(T) -> bool + 'static,
+        S: Display + 'static,
     {
         Self {
             matcher: Box::new(matcher),
@@ -32,24 +32,24 @@ impl<'a, T> Matcher<'a, T> {
 /// here because it's a simpler interface for students to implement.
 ///
 /// Also, it's a good excuse to try out using impl trait.
-pub struct Fizzy<'a, T: Display + Copy> {
-    matchers: Vec<Matcher<'a, T>>,
+pub struct Fizzy<T: Display + Copy> {
+    matchers: Vec<Matcher<T>>,
 }
 
-impl<'a, T: Display + Copy> Default for Fizzy<'a, T> {
+impl<T: Display + Copy + 'static> Default for Fizzy<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, T: Display + Copy> Fizzy<'a, T> {
+impl<T: Display + Copy + 'static> Fizzy<T> {
     pub fn new() -> Self {
         Self { matchers: vec![] }
     }
 
     // feel free to change the signature to `mut self` if you like
     #[must_use]
-    pub fn add_matcher(mut self, matcher: Matcher<'a, T>) -> Self {
+    pub fn add_matcher(mut self, matcher: Matcher<T>) -> Self {
         self.matchers.push(matcher);
         self
     }
@@ -59,7 +59,7 @@ impl<'a, T: Display + Copy> Fizzy<'a, T> {
     where
         I: Iterator<Item = T>,
     {
-        iter.map(|item| {
+        iter.map(move |item| {
             let mut new = String::new();
             let mut matched = false;
             for matcher in &self.matchers {
@@ -78,15 +78,14 @@ impl<'a, T: Display + Copy> Fizzy<'a, T> {
 }
 
 /// convenience function: return a Fizzy which applies the standard fizz-buzz rules
-pub fn fizz_buzz<'a, T>() -> Fizzy<'a, T>
+pub fn fizz_buzz<T: 'static>() -> Fizzy<T>
 where
     T: Copy + Display + Rem<Output = T> + From<u8> + PartialEq,
 {
     let new = Fizzy::new();
 
-    // new.add_matcher(Matcher::new(|n: T| n % T::from(3) == T::from(0), "fizz"))
-    //     .add_matcher(Matcher::new(|n: T| n % T::from(5) == T::from(0), "buzz"))
-    new
+    new.add_matcher(Matcher::new(|n: T| n % T::from(3) == T::from(0), "fizz"))
+        .add_matcher(Matcher::new(|n: T| n % T::from(5) == T::from(0), "buzz"))
 }
 
 #[cfg(test)]
