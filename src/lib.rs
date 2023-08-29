@@ -1,19 +1,19 @@
 // the PhantomData instances in this file are just to stop compiler complaints
 // about missing generics; feel free to remove them
 
-use std::fmt::Display;
+use std::{fmt::Display, ops::Rem};
 
 /// A Matcher is a single rule of fizzbuzz: given a function on T, should
 /// a word be substituted in? If yes, which word?
 pub struct Matcher<'a, T> {
     substitution: Box<dyn Display + 'a>,
-    matcher: Box<dyn FnMut(T) -> bool + 'a>,
+    matcher: Box<dyn Fn(T) -> bool + 'a>,
 }
 
 impl<'a, T> Matcher<'a, T> {
     pub fn new<F, S>(matcher: F, subs: S) -> Matcher<'a, T>
     where
-        F: FnMut(T) -> bool + 'a,
+        F: Fn(T) -> bool + 'a,
         S: Display + 'a,
     {
         Self {
@@ -32,23 +32,25 @@ impl<'a, T> Matcher<'a, T> {
 /// here because it's a simpler interface for students to implement.
 ///
 /// Also, it's a good excuse to try out using impl trait.
-pub struct Fizzy<'a, T: Display>(Vec<Matcher<'a, T>>);
+pub struct Fizzy<'a, T: Display + Copy> {
+    matchers: Vec<Matcher<'a, T>>,
+}
 
-impl<'a, T: Display> Default for Fizzy<'a, T> {
+impl<'a, T: Display + Copy> Default for Fizzy<'a, T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, T: Display> Fizzy<'a, T> {
+impl<'a, T: Display + Copy> Fizzy<'a, T> {
     pub fn new() -> Self {
-        Self(vec![])
+        Self { matchers: vec![] }
     }
 
     // feel free to change the signature to `mut self` if you like
     #[must_use]
     pub fn add_matcher(mut self, matcher: Matcher<'a, T>) -> Self {
-        self.0.push(matcher);
+        self.matchers.push(matcher);
         self
     }
 
@@ -57,15 +59,34 @@ impl<'a, T: Display> Fizzy<'a, T> {
     where
         I: Iterator<Item = T>,
     {
-        for matcher in self.0 {
-            iter.map(|n| if (matcher.matcher)(n){*matcher.substitution.to_string()} else {})
-        }
+        iter.map(|item| {
+            let mut new = String::new();
+            let mut matched = false;
+            for matcher in &self.matchers {
+                if (matcher.matcher)(item) {
+                    matched = true;
+                    new.push_str(matcher.substitution.to_string().as_str());
+                }
+            }
+            if !matched {
+                item.to_string()
+            } else {
+                new
+            }
+        })
     }
 }
 
 /// convenience function: return a Fizzy which applies the standard fizz-buzz rules
-pub fn fizz_buzz<'a, T: Display>() -> Fizzy<'a, T> {
-    unimplemented!()
+pub fn fizz_buzz<'a, T>() -> Fizzy<'a, T>
+where
+    T: Copy + Display + Rem<Output = T> + From<u8> + PartialEq,
+{
+    let new = Fizzy::new();
+
+    // new.add_matcher(Matcher::new(|n: T| n % T::from(3) == T::from(0), "fizz"))
+    //     .add_matcher(Matcher::new(|n: T| n % T::from(5) == T::from(0), "buzz"))
+    new
 }
 
 #[cfg(test)]
